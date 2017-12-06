@@ -11,6 +11,8 @@ if __name__ == "__main__":
     ## Handle command-line arguments
     parser = argparse.ArgumentParser(description='Advanced Lane Finding')
     parser.add_argument('-c', '--camera_calib', help='Camera calibration parameters file', dest='cam_cal', type=str, default=None)
+    parser.add_argument('-x', '--camera_calib_nx', help='Camera calibration chessboard number of x inner corners', dest='nx', type=int, default=9)
+    parser.add_argument('-y', '--camera_calib_ny', help='Camera calibration chessboard number of y inner corners', dest='ny', type=int, default=6)
     args = parser.parse_args()
 
     ## Calibrate camera
@@ -23,7 +25,7 @@ if __name__ == "__main__":
 
         # get camera calibration parameters
         print("Calibrating camera...")
-        cam_params = calibrate_camera(cal_images, 9, 6)
+        cam_params = calibrate_camera(cal_images, args.nx, args.ny)
 
         pickle.dump(cam_params, open('camera_params.p', 'wb'))
     else:
