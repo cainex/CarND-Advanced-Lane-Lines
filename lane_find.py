@@ -39,22 +39,26 @@ if __name__ == "__main__":
     else:
         cam_params = pickle.load( open(args.cam_cal, 'rb'))
 
+    current_lane = lane(cam_params)
 
     if (args.test_image == None):
         print("Processing video file:{}".format(args.test_video))
-        current_lane = lane(cam_params)
         # TODO : add code to handle processing of a video 
-        clip1 = VideoFileClip(args.test_video)
+        clip1 = editor.VideoFileClip(args.test_video)
         vid_clip = clip1.fl_image(current_lane.process_image)
         vid_clip.write_videofile(args.output_video, audio=False)
     else:
         # test undistortion of a calibration image
         print("processing test image...")
-        test_image = lane_image(cam_params, args.test_image)
+
+        test_image = mpimg.imread(args.test_image)
+
+        final_image = current_lane.process_image(test_image)
+        current_lane.get_img().set_final_image(final_image)
 
         if (args.dump_dir == None):
-            test_image.plot_images()
+            current_lane.get_img().plot_images()
         else:
-            test_image.dump_images(args.dump_dir)
+            current_lane.get_img().dump_images(args.dump_dir)
 
 
