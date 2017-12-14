@@ -7,7 +7,7 @@ class lane_image:
     """
     Class to hold an image and provide image processing routines
     """
-    def __init__(self, cam_params, input_image):
+    def __init__(self, cam_params, input_image, params=None):
         self.cam_params = cam_params
 #        self.filename = filename
         self.images = {}
@@ -27,26 +27,28 @@ class lane_image:
         # undistort image
         self.images['undistorted'] = self.undistort_image()
 
-        # colorspace params
-        self.color_params = {}
-        self.color_params['gray'] = {'thresh' : (25,100)}
-        self.color_params['s_channel'] = {'thresh' : (90, 255)}
-        self.color_params['h_channel'] = {'thresh' : (15, 100)}
+        # params
+        if params == None:
+            self.params = {}
+            self.params['color'] = {}
+            self.params['color']['gray'] = {'thresh' : (25,100)}
+            self.params['color']['s_channel'] = {'thresh' : (90, 255)}
+            self.params['color']['h_channel'] = {'thresh' : (15, 100)}
+            self.params['thresh'] = {}
+            self.params['thresh']['abs_sobel'] = {"kernel" : 3, "thresh" : (20,100)}
+            self.params['thresh']['mag_grad'] = {"kernel" : 3, "thresh" : (30, 100)}
+            self.params['thresh']['dir_grad'] = {"kernel" : 15, "thresh" : (0.7, 1.0)}
+        else:
+            self.params = params
 
         # colorspace conversions
         self.images['gray'] = cv2.cvtColor(self.images['undistorted'], cv2.COLOR_RGB2GRAY)
         self.images['hls'] = cv2.cvtColor(self.images['undistorted'], cv2.COLOR_RGB2HLS)
 
         # binary colorspace conversions
-        self.images['gray_binary'] = self.binary_image(self.images['gray'], self.color_params['gray']['thresh'], True)
-        self.images['s_binary'] = self.binary_image(self.images['hls'][:,:,2], self.color_params['s_channel']['thresh'])
-        self.images['h_binary'] = self.binary_image(self.images['hls'][:,:,1], self.color_params['h_channel']['thresh'], True)
-
-        # gradient parameters
-        self.thresh_params = {}
-        self.thresh_params['abs_sobel'] = {"kernel" : 3, "thresh" : (20,100)}
-        self.thresh_params['mag_grad'] = {"kernel" : 3, "thresh" : (30, 100)}
-        self.thresh_params['dir_grad'] = {"kernel" : 15, "thresh" : (0.7, 1.0)}
+        self.images['gray_binary'] = self.binary_image(self.images['gray'], self.params['color']['gray']['thresh'], True)
+        self.images['s_binary'] = self.binary_image(self.images['hls'][:,:,2], self.params['color']['s_channel']['thresh'])
+        self.images['h_binary'] = self.binary_image(self.images['hls'][:,:,1], self.params['color']['h_channel']['thresh'], True)
 
         # Get gradient images
         self.images['sobelx'] = self.abs_sobel_thresh('x')
@@ -70,10 +72,9 @@ class lane_image:
         self.images['masked'] = self.mask_image(self.images['undistorted'])
         self.images['transform_grad'] = self.transform_image(self.mask_image(self.images['combined_grad']))
 
-    def set_color_parameters(self, channel, thresh):
-        if channel in ['gray_binary', 's_binary', 'h_binary']:
-            self.color_params[channel]['thresh'] = thresh
-            
+    def set_parameters(self, params):
+        self.params = params
+
     def get_images(self):
         return self.images
 
@@ -91,9 +92,9 @@ class lane_image:
     def abs_sobel_thresh(self, orient='x'):
         # 1) Take the derivative in x or y given orient = 'x' or 'y'
         if orient == 'x':
-            sobel = cv2.Sobel(self.images['gray'], cv2.CV_64F, 1, 0, ksize = self.thresh_params['abs_sobel']['kernel'])
+            sobel = cv2.Sobel(self.images['gray'], cv2.CV_64F, 1, 0, ksize = self.params['thresh']['abs_sobel']['kernel'])
         if orient == 'y':
-            sobel = cv2.Sobel(self.images['gray'], cv2.CV_64F, 0, 1, ksize = self.thresh_params['abs_sobel']['kernel'])
+            sobel = cv2.Sobel(self.images['gray'], cv2.CV_64F, 0, 1, ksize = self.params['thresh']['abs_sobel']['kernel'])
             
         # 2) Take the absolute value of the derivative or gradient
         abs_sobel = np.absolute(sobel)
@@ -101,34 +102,34 @@ class lane_image:
         scaled_sobel = np.uint8(255*abs_sobel/np.max(abs_sobel))
         # 4) Create a mask of 1's where the scaled gradient magnitude 
                 # is > thresh_min and < thresh_max
-        binary_output = self.binary_image(scaled_sobel, self.thresh_params['abs_sobel']['thresh'])
+        binary_output = self.binary_image(scaled_sobel, self.params['thresh']['abs_sobel']['thresh'])
         # 5) Return this mask as your binary_output image
         return binary_output
 
     def mag_thresh(self):
         # 1) Take the gradient in x and y separately
-        sobelx = cv2.Sobel(self.images['gray'], cv2.CV_64F, 1, 0, ksize=self.thresh_params['mag_grad']['kernel'])
-        sobely = cv2.Sobel(self.images['gray'], cv2.CV_64F, 0, 1, ksize=self.thresh_params['mag_grad']['kernel'])
+        sobelx = cv2.Sobel(self.images['gray'], cv2.CV_64F, 1, 0, ksize=self.params['thresh']['mag_grad']['kernel'])
+        sobely = cv2.Sobel(self.images['gray'], cv2.CV_64F, 0, 1, ksize=self.params['thresh']['mag_grad']['kernel'])
         # 2) Calculate the magnitude 
         mag = np.sqrt(sobelx**2+sobely**2)
         # 3) Scale to 8-bit (0 - 255) and convert to type = np.uint8
         scaled_sobel = np.uint8(255*mag/np.max(mag))
         # 4) Create a binary mask where mag thresholds are met
-        binary_output = self.binary_image(scaled_sobel, self.thresh_params['mag_grad']['thresh'])
+        binary_output = self.binary_image(scaled_sobel, self.params['thresh']['mag_grad']['thresh'])
         # 5) Return this mask as your binary_output image
         return binary_output
         
     def dir_thresh(self):
         # 1) Take the gradient in x and y separately
-        sobelx = cv2.Sobel(self.images['gray'], cv2.CV_64F, 1, 0, ksize=self.thresh_params['dir_grad']['kernel'])
-        sobely = cv2.Sobel(self.images['gray'], cv2.CV_64F, 0, 1, ksize=self.thresh_params['dir_grad']['kernel'])
+        sobelx = cv2.Sobel(self.images['gray'], cv2.CV_64F, 1, 0, ksize=self.params['thresh']['dir_grad']['kernel'])
+        sobely = cv2.Sobel(self.images['gray'], cv2.CV_64F, 0, 1, ksize=self.params['thresh']['dir_grad']['kernel'])
         # 2) Take the absolute value of the x and y gradients
         abs_sobelx = np.absolute(sobelx)
         abs_sobely = np.absolute(sobely)
         # 3) Use np.arctan2(abs_sobely, abs_sobelx) to calculate the direction of the gradient 
         dirgrad = np.arctan2(abs_sobely,abs_sobelx)
         # 4) Create a binary mask where direction thresholds are met
-        binary_output = self.binary_image(dirgrad, self.thresh_params['dir_grad']['thresh'])
+        binary_output = self.binary_image(dirgrad, self.params['thresh']['dir_grad']['thresh'])
         # 5) Return this mask as your binary_output image
         return binary_output
 
