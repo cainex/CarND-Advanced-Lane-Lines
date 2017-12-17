@@ -17,6 +17,7 @@ if __name__ == "__main__":
     parser.add_argument('-c', '--camera_calib', help='Camera calibration parameters file', dest='cam_cal', type=str, default=None)
     parser.add_argument('-x', '--camera_calib_nx', help='Camera calibration chessboard number of x inner corners', dest='nx', type=int, default=9)
     parser.add_argument('-y', '--camera_calib_ny', help='Camera calibration chessboard number of y inner corners', dest='ny', type=int, default=6)
+    parser.add_argument('-p', '--parameters', help='Image processing parameters', dest='params', type=str, default=None)
     parser.add_argument('-d', '--dump_dir', help="Directory to dump images", dest='dump_dir', type=str, default=None)
     parser.add_argument('-t', '--test_image', help="test image to use", dest='test_image', type=str, default=None)
     parser.add_argument('-v', '--test_video', help='test video file to use', dest='test_video', type=str, default='project_video.mp4')
@@ -27,7 +28,7 @@ if __name__ == "__main__":
     # get calibration images
     cam_params = None
 
-    if args.cam_cal == None:
+    if args.cam_cal is None:
         print("Getting list of calibration images...")
         cal_images = glob.glob('./camera_cal/calibration*.jpg')
 
@@ -39,12 +40,16 @@ if __name__ == "__main__":
     else:
         cam_params = pickle.load( open(args.cam_cal, 'rb'))
 
-    current_lane = lane(cam_params)
+    params = None
+    if args.params is not None:
+        params = pickle.load(open(args.params, 'rb'))
+        
+    current_lane = lane(cam_params, params)
 
     if (args.test_image == None):
         print("Processing video file:{}".format(args.test_video))
         # TODO : add code to handle processing of a video 
-        clip1 = editor.VideoFileClip(args.test_video)
+        clip1 = editor.VideoFileClip(args.test_video).subclip(0, 10)
         vid_clip = clip1.fl_image(current_lane.process_image)
         vid_clip.write_videofile(args.output_video, audio=False)
     else:

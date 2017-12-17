@@ -63,13 +63,13 @@ class lane_image:
                                                     [1120, 719],
                                                     [190, 719],
                                                     [600, 444]])
-        self.transform_params['dst'] = np.float32([ [950, 50], 
-                                                    [950, 719],
-                                                    [375, 719],
-                                                    [375, 50]])
+        self.transform_params['dst'] = np.float32([ [840, 50], 
+                                                    [840, 719],
+                                                    [440, 719],
+                                                    [440, 50]])
 
         # Transformed image
-        self.images['masked'] = self.mask_image(self.images['undistorted'])
+        #self.images['masked'] = self.mask_image(self.images['undistorted'])
         self.images['transform_grad'] = self.transform_image(self.mask_image(self.images['combined_grad']))
 
     def set_parameters(self, params):
@@ -178,9 +178,8 @@ class lane_image:
         
     def combine_gradients(self):
         grad_img = self.or_img(self.and_img(self.images['sobelx'], self.images['sobely']), self.and_img(self.images['mag_grad'], self.images['dir_grad']))
-        return self.or_img(grad_img, self.and_img(self.images['s_binary'], self.images['h_binary']))
-#        grad_s_img = self.or_img(grad_img, self.images['s_binary'])
-#        return self.or_img(grad_s_img, self.images['gray_binary'])
+        return self.or_img(grad_img, self.or_img(self.images['s_binary'], self.images['h_binary']))
+        #return self.and_img(grad_img, self.or_img(self.images['s_binary'], self.images['h_binary']))
         
     def binary_image(self, src, thresh, invert=False):
         if invert == True:

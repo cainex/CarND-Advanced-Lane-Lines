@@ -137,7 +137,7 @@ class layout_widget(QtGui.QWidget):
         self.cam_params = pickle.load( open('./camera_params.p', 'rb'))
 
         self.vid_clip = editor.VideoFileClip(video_file)
-        print(self.vid_clip.duration)
+        #print(self.vid_clip.duration)
 
         self.frame_value = 0.0
         self.frame_select_value = 'orig'
@@ -377,9 +377,9 @@ class gui_app(QtGui.QMainWindow):
         w.setWindowTitle("Load Parameters")
 
         filename = QtGui.QFileDialog.getOpenFileName(w, 'Open File', '.')
-        print(filename)
+        #print(filename)
         params = pickle.load( open(filename, 'rb'))
-        print(params)
+        #print(params)
         self.layout.set_parameters(params)
 
         w.show()
@@ -390,7 +390,7 @@ class gui_app(QtGui.QMainWindow):
         w.setWindowTitle("Save Parameters")
 
         filename = QtGui.QFileDialog.getOpenFileName(w, 'Save File', '.')
-        print(filename)
+        #print(filename)
         pickle.dump(self.layout.get_parameters(), open(filename, 'wb'))
 
         w.show()
