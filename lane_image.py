@@ -30,10 +30,13 @@ class lane_image:
         # params
         if params == None:
             self.params = {}
-            self.params['color'] = {}
             self.params['color']['gray'] = {'thresh' : (25,100)}
-            self.params['color']['s_channel'] = {'thresh' : (90, 255)}
-            self.params['color']['h_channel'] = {'thresh' : (15, 100)}
+            self.params['color']['hls_h_channel'] = {'thresh' : (15, 100)}
+            self.params['color']['hls_l_channel'] = {'thresh' : (15, 100)}
+            self.params['color']['hls_s_channel'] = {'thresh' : (90, 255)}
+            self.params['color']['hsv_h_channel'] = {'thresh' : (15, 100)}
+            self.params['color']['hsv_s_channel'] = {'thresh' : (15, 100)}
+            self.params['color']['hsv_v_channel'] = {'thresh' : (90, 255)}
             self.params['thresh'] = {}
             self.params['thresh']['abs_sobel'] = {"kernel" : 3, "thresh" : (20,100)}
             self.params['thresh']['mag_grad'] = {"kernel" : 3, "thresh" : (30, 100)}
@@ -44,17 +47,32 @@ class lane_image:
         # colorspace conversions
         self.images['gray'] = cv2.cvtColor(self.images['undistorted'], cv2.COLOR_RGB2GRAY)
         self.images['hls'] = cv2.cvtColor(self.images['undistorted'], cv2.COLOR_RGB2HLS)
+        self.images['hsv'] = cv2.cvtColor(self.images['undistorted'], cv2.COLOR_RGB2HSV)
 
         # binary colorspace conversions
-        self.images['gray_binary'] = self.binary_image(self.images['gray'], self.params['color']['gray']['thresh'], True)
-        self.images['s_binary'] = self.binary_image(self.images['hls'][:,:,2], self.params['color']['s_channel']['thresh'])
-        self.images['h_binary'] = self.binary_image(self.images['hls'][:,:,1], self.params['color']['h_channel']['thresh'], True)
+        self.images['gray_binary'] = self.binary_image(self.images['gray'], self.params['color']['gray']['thresh'])
+        self.images['hls_h'] = self.images['hls'][:,:,0]
+        self.images['hls_l'] = self.images['hls'][:,:,1]
+        self.images['hls_s'] = self.images['hls'][:,:,2]
+
+        self.images['hsv_h'] = self.images['hsv'][:,:,0]
+        self.images['hsv_s'] = self.images['hsv'][:,:,1]
+        self.images['hsv_v'] = self.images['hsv'][:,:,2]
+
+        self.images['hls_h_binary'] = self.binary_image(self.images['hls'][:,:,0], self.params['color']['hls_h_channel']['thresh'])
+        self.images['hls_l_binary'] = self.binary_image(self.images['hls'][:,:,1], self.params['color']['hls_l_channel']['thresh'])
+        self.images['hls_s_binary'] = self.binary_image(self.images['hls'][:,:,2], self.params['color']['hls_s_channel']['thresh'])
+
+        self.images['hsv_h_binary'] = self.binary_image(self.images['hsv'][:,:,0], self.params['color']['hsv_h_channel']['thresh'])
+        self.images['hsv_s_binary'] = self.binary_image(self.images['hsv'][:,:,1], self.params['color']['hsv_s_channel']['thresh'])
+        self.images['hsv_v_binary'] = self.binary_image(self.images['hsv'][:,:,2], self.params['color']['hsv_v_channel']['thresh'])
 
         # Get gradient images
         self.images['sobelx'] = self.abs_sobel_thresh('x')
         self.images['sobely'] = self.abs_sobel_thresh('y')
         self.images['mag_grad'] = self.mag_thresh()
         self.images['dir_grad'] = self.dir_thresh()
+        self.images['mag_and_dir'] = self.and_img(self.images['mag_grad'], self.images['dir_grad'])
         self.images['combined_grad'] = self.combine_gradients()
 
         # Transform parameters
@@ -177,8 +195,12 @@ class lane_image:
         return combined
         
     def combine_gradients(self):
-        grad_img = self.or_img(self.and_img(self.images['sobelx'], self.images['sobely']), self.and_img(self.images['mag_grad'], self.images['dir_grad']))
-        return self.or_img(grad_img, self.or_img(self.images['s_binary'], self.images['h_binary']))
+        grad_img = self.and_img(self.images['sobelx'], self.and_img(self.images['mag_grad'], self.images['dir_grad']))
+        color_img = self.or_img(self.or_img(self.images['hls_l_binary'], self.images['hsv_h_binary']), self.or_img(self.images['hsv_s_binary'], self.images['hsv_v_binary']))
+        return self.or_img(grad_img, color_img)
+        
+        #grad_img = self.or_img(self.and_img(self.images['sobelx'], self.images['sobely']), self.and_img(self.images['mag_grad'], self.images['dir_grad']))
+        #return self.and_img(grad_img, self.or_img(self.images['hls_s_binary'], self.images['hls_h_binary']))
         #return self.and_img(grad_img, self.or_img(self.images['s_binary'], self.images['h_binary']))
         
     def binary_image(self, src, thresh, invert=False):
@@ -204,10 +226,10 @@ class lane_image:
 
         ax[1][0].imshow(self.images['hls'])
         ax[1][0].set_title('hls')
-        ax[1][1].imshow(self.images['s_binary'], cmap='gray')
-        ax[1][1].set_title('s_channel_binary')
-        ax[1][2].imshow(self.images['h_binary'], cmap='gray')
-        ax[1][2].set_title('h_channel_binary')
+        ax[1][1].imshow(self.images['hls_s_binary'], cmap='gray')
+        ax[1][1].set_title('hls_s_channel_binary')
+        ax[1][2].imshow(self.images['hls_h_binary'], cmap='gray')
+        ax[1][2].set_title('hls_h_channel_binary')
 
         ax[2][0].imshow(self.images['sobelx'], cmap='gray')
         ax[2][0].set_title('sobelx')

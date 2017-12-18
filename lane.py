@@ -3,6 +3,8 @@ from lane_line import lane_line
 import numpy as np
 import cv2
 from scipy.stats import pearsonr
+from sklearn.metrics import mean_squared_error
+from sklearn.metrics import mean_squared_log_error
 
 class lane:
     def __init__(self, camera_params, params):
@@ -26,17 +28,83 @@ class lane:
         self.left_lane = lane_line()
         self.right_lane = lane_line()
 
+        self.rms = 0.0
+        self.mse = 0.0
+        self.left_mse = 0.0
+        self.right_mse = 0.0
+        self.good_left_lane = True
+        self.good_right_lane = True
+        self.left_lane_pos = 0.0
+        self.right_lane_pos = 0.0
+        self.left_lane_pos_rmse = 0.0
+        self.right_lane_pos_rmse = 0.0
+
     def get_img(self):
         return self.img
 
     def process_image(self, image):
         self.img = lane_image(self.camera_params, image, self.params)
         image = self.img.get_images()['transform_grad']
+        ploty = np.linspace(0, image.shape[0]-1, image.shape[0])
 
-        left_fitx, ploty = self.fit_line(image, self.left_lane, True)
-        right_fitx, ploty = self.fit_line(image, self.right_lane, False)
+        self.fit_line(image, self.left_lane, True)
+        self.fit_line(image, self.right_lane, False)
 
-        return self.draw_final_image(self.img, left_fitx, right_fitx, ploty)
+        ### Make some decisions about detected lines
+        self.good_left_lane = True
+        self.good_right_lane = True
+
+        self.left_curverad = self.left_lane.calculate_curvature(self.left_lane.currentx)
+        self.right_curverad = self.right_lane.calculate_curvature(self.right_lane.currentx)
+        self.rms = np.sqrt(np.mean(np.array([self.left_curverad,self.right_curverad])**2))
+#        self.mse = np.sqrt(mean_squared_error([self.left_curverad], [self.right_curverad]))
+        self.mse = mean_squared_log_error([self.left_curverad], [self.right_curverad])
+
+        if len(self.left_lane.recent_xfitted) >= self.left_lane.history_depth and len(self.right_lane.recent_xfitted) >= self.right_lane.history_depth :
+            ### Both lane lines are locked, make some determinations based on 
+            ### previous values. 
+            self.left_mse = mean_squared_log_error([self.left_curverad], [self.left_lane.radius_of_curvature])
+            self.right_mse = mean_squared_log_error([self.right_curverad], [self.right_lane.radius_of_curvature])
+            if self.left_mse > 3.0:
+                self.good_left_lane = False
+                # self.good_left_lane = True
+            if self.right_mse > 3.0:
+                self.good_right_lane = False
+                # self.good_right_lane = True
+
+            self.left_lane_pos = self.left_lane.get_pos()
+            self.right_lane_pos = self.right_lane.get_pos()
+            self.left_lane_pos_rmse = np.sqrt(mean_squared_error([self.left_lane_pos],[self.left_lane.line_base_pos]))
+            self.right_lane_pos_rmse = np.sqrt(mean_squared_error([self.right_lane_pos],[self.right_lane.line_base_pos]))
+
+            if self.left_lane_pos_rmse > 0.15:
+                self.good_left_lane = False
+            if self.right_lane_pos_rmse > 0.15:
+                self.good_right_lane = False
+            
+        else:
+            if self.left_lane.detected == True and self.right_lane.detected == True:
+                ### Both lanes were detected in this run
+                # 1) Check that curvature is similar
+
+                if self.mse > 1.000:
+                    self.good_left_lane = False
+                    self.good_right_lane = False
+            else:
+                self.good_left_lane = False
+                self.good_right_lane = False
+
+        if self.good_left_lane:        
+            self.update_lane(self.left_lane)
+        if self.good_right_lane:        
+            self.update_lane(self.right_lane)
+
+        self.left_lane.decay()
+        self.right_lane.decay()
+
+        return_image = self.draw_final_image(self.img, self.left_lane.bestx, self.right_lane.bestx, ploty)
+
+        return return_image
 
     def fit_line(self, image, lane, left):
         # print(image.shape)
@@ -48,25 +116,29 @@ class lane:
 
         lane_inds = []
 
-        if lane.current_fit is None:
+        if lane.best_fit is None:
             lane_inds = self.sliding_windows(image, nonzerox, nonzeroy, left)
         else:
-            lane_inds = self.sliding_windows_pretrack(image, nonzerox, nonzeroy, lane.current_fit)
+            lane_inds = self.sliding_windows_pretrack(image, nonzerox, nonzeroy, lane.best_fit)
 
+        if len(lane_inds) > 1000 :
+            lane.detected = True
+        else:
+            lane.detected = False
+        
         # Extract left and right line pixel positions
         lane.allx = nonzerox[lane_inds]
         lane.ally = nonzeroy[lane_inds] 
 
         # Fit a second order polynomial to each
-        lane.fit_polynomial()
-
-        # Generate x and y values for plotting
         ploty = np.linspace(0, image.shape[0]-1, image.shape[0])
-        y_eval = np.max(ploty)
+        lane.fit_polynomial(ploty)
 
-        fitx = lane.current_fit[0]*ploty**2 + lane.current_fit[1]*ploty + lane.current_fit[2]
+        #######################################################################################################
 
-        lane.add_new_fit(fitx)
+    def update_lane(self, lane):
+        lane.frames_since_update = 0
+        lane.add_new_fit(lane.currentx)
 
         lane.average_xfit()
 
@@ -76,9 +148,7 @@ class lane:
         #find slope at ymax
         lane.calculate_slope()
 
-        # return left_fitx, right_fitx, ploty
-        return lane.bestx, ploty
-
+        lane.line_base_pos = lane.get_best_pos()
        
     def sliding_windows(self, image, nonzerox, nonzeroy, left):
         # Take a histogram of the bottom half of the image
@@ -138,30 +208,50 @@ class lane:
         return lane_inds
 
     def draw_final_image(self, img, left_fitx, right_fitx, ploty):
+        result = img.get_images()['undistorted']
 
-        image = img.get_images()['transform_grad']
-        # Create an image to draw the lines on
-        warp_zero = np.zeros_like(image).astype(np.uint8)
-        color_warp = np.dstack((warp_zero, warp_zero, warp_zero))
+        if left_fitx is not None and right_fitx is not None:
+            image = img.get_images()['transform_grad']
+            # Create an image to draw the lines on
+            warp_zero = np.zeros_like(image).astype(np.uint8)
+            color_warp = np.dstack((warp_zero, warp_zero, warp_zero))
 
-        # Recast the x and y points into usable format for cv2.fillPoly()
-        pts_left = np.array([np.transpose(np.vstack([left_fitx, ploty]))])
-        pts_right = np.array([np.flipud(np.transpose(np.vstack([right_fitx, ploty])))])
-        pts = np.hstack((pts_left, pts_right))
+            # Recast the x and y points into usable format for cv2.fillPoly()
+            pts_left = np.array([np.transpose(np.vstack([left_fitx, ploty]))])
+            pts_right = np.array([np.flipud(np.transpose(np.vstack([right_fitx, ploty])))])
+            pts = np.hstack((pts_left, pts_right))
 
-        # Draw the lane onto the warped blank image
-        cv2.fillPoly(color_warp, np.int_([pts]), (0,255, 0))
+            # Draw the lane onto the warped blank image
+            cv2.fillPoly(color_warp, np.int_([pts]), (0,255, 0))
 
-        # Warp the blank back to original image space using inverse perspective matrix (Minv)
-        newwarp = img.transform_image(color_warp, True)
-        # Combine the result with the original image
-        result = cv2.addWeighted(img.get_images()['undistorted'], 1, newwarp, 0.3, 0)
+            # Warp the blank back to original image space using inverse perspective matrix (Minv)
+            newwarp = img.transform_image(color_warp, True)
+            # Combine the result with the original image
+            result = cv2.addWeighted(img.get_images()['undistorted'], 1, newwarp, 0.3, 0)
+
         # out_img_gray = np.zeros_like(img.get_images()['combined_grad'])
         # out_img_gray[img.get_images()['combined_grad'] == 1] = 255
         # out_img = cv2.cvtColor(out_img_gray, cv2.COLOR_GRAY2RGB)
         # result = cv2.addWeighted(out_img, 1, newwarp, 0.3, 0)
-        cv2.putText(result,'left:{:.2f}m right:{:.2f}m'.format(self.left_lane.radius_of_curvature, self.right_lane.radius_of_curvature), (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
-        cv2.putText(result, 'lslope:{:.2f} rslope:{:.2f}'.format(self.left_lane.slope, self.right_lane.slope), (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+        cv2.putText(result,'left:{:.2f}m curr:{:.2f}m'.format(self.left_lane.radius_of_curvature, self.left_curverad), (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+        cv2.putText(result,'right:{:.2f}m curr{:.2f}m'.format(self.right_lane.radius_of_curvature, self.right_curverad), (1050, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+        cv2.putText(result,'lslope:{:.2f}'.format(self.left_lane.slope), (50, 75), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+        cv2.putText(result,'rslope:{:.2f}'.format(self.right_lane.slope), (1050, 75), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+        cv2.putText(result,'lrmse:{:.4f}'.format(self.left_mse), (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+        cv2.putText(result,'rrmse:{:.4f}'.format(self.right_mse), (1050, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+        cv2.putText(result,'lfsu:{}'.format(self.left_lane.frames_since_update), (50, 125), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+        cv2.putText(result,'rfsu:{}'.format(self.right_lane.frames_since_update), (1050, 125), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+        cv2.putText(result,'lpos:{:.2f}-{:.2f}[{:.2f}]'.format(self.left_lane_pos, self.left_lane.line_base_pos, self.left_lane_pos_rmse), (50, 150), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+        cv2.putText(result,'rpos:{:.2f}-{:.2f}[{:.2f}]'.format(self.right_lane_pos, self.right_lane.line_base_pos, self.right_lane_pos_rmse), (1050, 150), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+        
+
+        cv2.putText(result,'rms:{:.2f}m'.format(self.rms), (600, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+        cv2.putText(result,'rmse:{:.4f}'.format(self.mse), (600, 75), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+        cv2.putText(result,'lupdate:{}'.format(self.good_left_lane), (500, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0) if self.good_left_lane else (255, 0, 0), 2)
+        cv2.putText(result,'rupdate:{}'.format(self.good_right_lane), (700, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0) if self.good_right_lane else (255, 0, 0), 2)
+        
+        cv2.putText(result, 'ldet:{}[{}]'.format(self.left_lane.detected, len(self.left_lane.allx)), (50, 600), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0) if self.left_lane.detected == True else (255,0,0), 2)
+        cv2.putText(result, 'rdet:{}[{}]'.format(self.right_lane.detected, len(self.right_lane.allx)), (1050, 600), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0) if self.right_lane.detected == True else (255,0,0), 2)
         return result
 
 

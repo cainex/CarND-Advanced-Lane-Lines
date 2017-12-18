@@ -22,6 +22,7 @@ if __name__ == "__main__":
     parser.add_argument('-t', '--test_image', help="test image to use", dest='test_image', type=str, default=None)
     parser.add_argument('-v', '--test_video', help='test video file to use', dest='test_video', type=str, default='project_video.mp4')
     parser.add_argument('-o', '--output_video', help='name of output video file', dest='output_video', type=str, default='video_out.mp4')
+    parser.add_argument('-s', '--subclip', help='process up to this point', dest='subclip', type=int, default=None)
     args = parser.parse_args()
 
     ## Calibrate camera
@@ -49,7 +50,10 @@ if __name__ == "__main__":
     if (args.test_image == None):
         print("Processing video file:{}".format(args.test_video))
         # TODO : add code to handle processing of a video 
-        clip1 = editor.VideoFileClip(args.test_video).subclip(0, 10)
+        if args.subclip is None:
+            clip1 = editor.VideoFileClip(args.test_video)
+        else:
+            clip1 = editor.VideoFileClip(args.test_video).subclip(0, args.subclip)
         vid_clip = clip1.fl_image(current_lane.process_image)
         vid_clip.write_videofile(args.output_video, audio=False)
     else:
