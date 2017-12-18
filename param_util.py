@@ -145,8 +145,12 @@ class layout_widget(QtGui.QWidget):
         self.params = {}
         self.params['color'] = {}
         self.params['color']['gray'] = {'thresh' : (25,100)}
-        self.params['color']['s_channel'] = {'thresh' : (90, 255)}
-        self.params['color']['h_channel'] = {'thresh' : (15, 100)}
+        self.params['color']['hls_h_channel'] = {'thresh' : (15, 100)}
+        self.params['color']['hls_l_channel'] = {'thresh' : (15, 100)}
+        self.params['color']['hls_s_channel'] = {'thresh' : (90, 255)}
+        self.params['color']['hsv_h_channel'] = {'thresh' : (15, 100)}
+        self.params['color']['hsv_s_channel'] = {'thresh' : (15, 100)}
+        self.params['color']['hsv_v_channel'] = {'thresh' : (90, 255)}
         self.params['thresh'] = {}
         self.params['thresh']['abs_sobel'] = {"kernel" : 3, "thresh" : (20,100)}
         self.params['thresh']['mag_grad'] = {"kernel" : 3, "thresh" : (30, 100)}
@@ -173,19 +177,47 @@ class layout_widget(QtGui.QWidget):
         self.gray_bin_controls = threshold_layout(self, self.params['color']['gray']['thresh'])
         self.controls_layout.addLayout(self.gray_bin_controls)
        
-        self.s_bin_lbl = QtGui.QLabel()
-        self.s_bin_lbl.setText('S-Binary Threshold')
-        self.s_bin_lbl.setFixedWidth(400)
-        self.controls_layout.addWidget(self.s_bin_lbl)
-        self.s_bin_controls = threshold_layout(self, self.params['color']['s_channel']['thresh'])
-        self.controls_layout.addLayout(self.s_bin_controls)
+        self.hls_h_bin_lbl = QtGui.QLabel()
+        self.hls_h_bin_lbl.setText('hls_H-Binary Threshold')
+        self.hls_h_bin_lbl.setFixedWidth(400)
+        self.controls_layout.addWidget(self.hls_h_bin_lbl)
+        self.hls_h_bin_controls = threshold_layout(self, self.params['color']['hls_h_channel']['thresh'])
+        self.controls_layout.addLayout(self.hls_h_bin_controls)
        
-        self.h_bin_lbl = QtGui.QLabel()
-        self.h_bin_lbl.setText('H-Binary Threshold')
-        self.h_bin_lbl.setFixedWidth(400)
-        self.controls_layout.addWidget(self.h_bin_lbl)
-        self.h_bin_controls = threshold_layout(self, self.params['color']['h_channel']['thresh'])
-        self.controls_layout.addLayout(self.h_bin_controls)
+        self.hls_l_bin_lbl = QtGui.QLabel()
+        self.hls_l_bin_lbl.setText('hls_l-Binary Threshold')
+        self.hls_l_bin_lbl.setFixedWidth(400)
+        self.controls_layout.addWidget(self.hls_l_bin_lbl)
+        self.hls_l_bin_controls = threshold_layout(self, self.params['color']['hls_l_channel']['thresh'])
+        self.controls_layout.addLayout(self.hls_l_bin_controls)
+       
+        self.hls_s_bin_lbl = QtGui.QLabel()
+        self.hls_s_bin_lbl.setText('hls_S-Binary Threshold')
+        self.hls_s_bin_lbl.setFixedWidth(400)
+        self.controls_layout.addWidget(self.hls_s_bin_lbl)
+        self.hls_s_bin_controls = threshold_layout(self, self.params['color']['hls_s_channel']['thresh'])
+        self.controls_layout.addLayout(self.hls_s_bin_controls)
+       
+        self.hsv_h_bin_lbl = QtGui.QLabel()
+        self.hsv_h_bin_lbl.setText('hsv_H-Binary Threshold')
+        self.hsv_h_bin_lbl.setFixedWidth(400)
+        self.controls_layout.addWidget(self.hsv_h_bin_lbl)
+        self.hsv_h_bin_controls = threshold_layout(self, self.params['color']['hsv_h_channel']['thresh'])
+        self.controls_layout.addLayout(self.hsv_h_bin_controls)
+       
+        self.hsv_s_bin_lbl = QtGui.QLabel()
+        self.hsv_s_bin_lbl.setText('hsv_s-Binary Threshold')
+        self.hsv_s_bin_lbl.setFixedWidth(400)
+        self.controls_layout.addWidget(self.hsv_s_bin_lbl)
+        self.hsv_s_bin_controls = threshold_layout(self, self.params['color']['hsv_s_channel']['thresh'])
+        self.controls_layout.addLayout(self.hsv_s_bin_controls)
+       
+        self.hsv_v_bin_lbl = QtGui.QLabel()
+        self.hsv_v_bin_lbl.setText('hsv_v-Binary Threshold')
+        self.hsv_v_bin_lbl.setFixedWidth(400)
+        self.controls_layout.addWidget(self.hsv_v_bin_lbl)
+        self.hsv_v_bin_controls = threshold_layout(self, self.params['color']['hsv_v_channel']['thresh'])
+        self.controls_layout.addLayout(self.hsv_v_bin_controls)
        
         self.abs_sobel_k_lbl = QtGui.QLabel()
         self.abs_sobel_k_lbl.setText('ABS Sobel Kernels')
@@ -256,12 +288,26 @@ class layout_widget(QtGui.QWidget):
         self.frame_select.addItem("hls")
         self.frame_select.addItem("gray")
         self.frame_select.addItem("gray_binary")
-        self.frame_select.addItem("s_binary")
-        self.frame_select.addItem("h_binary")
+
+        self.frame_select.addItem("hls_h")
+        self.frame_select.addItem("hls_l")
+        self.frame_select.addItem("hls_s")
+        self.frame_select.addItem("hsv_h")
+        self.frame_select.addItem("hsv_s")
+        self.frame_select.addItem("hsv_v")
+                
+        self.frame_select.addItem("hls_h_binary")
+        self.frame_select.addItem("hls_l_binary")
+        self.frame_select.addItem("hls_s_binary")
+        self.frame_select.addItem("hsv_h_binary")
+        self.frame_select.addItem("hsv_s_binary")
+        self.frame_select.addItem("hsv_v_binary")
+
         self.frame_select.addItem("sobelx")
         self.frame_select.addItem("sobely")
         self.frame_select.addItem("mag_grad")
         self.frame_select.addItem("dir_grad")
+        self.frame_select.addItem("mag_and_dir")
         self.frame_select.addItem("combined_grad")
         self.frame_select.addItem("transform_grad")
         self.frame_select.currentIndexChanged.connect(self.frame_select_change)
@@ -281,8 +327,12 @@ class layout_widget(QtGui.QWidget):
     
     def get_parameters(self):
         self.params['color']['gray'] = {'thresh' : self.gray_bin_controls.get_params()}
-        self.params['color']['s_channel'] = {'thresh' : self.s_bin_controls.get_params()}
-        self.params['color']['h_channel'] = {'thresh' : self.h_bin_controls.get_params()}
+        self.params['color']['hls_h_channel'] = {'thresh' : self.hls_h_bin_controls.get_params()}
+        self.params['color']['hls_l_channel'] = {'thresh' : self.hls_l_bin_controls.get_params()}
+        self.params['color']['hls_s_channel'] = {'thresh' : self.hls_s_bin_controls.get_params()}
+        self.params['color']['hsv_h_channel'] = {'thresh' : self.hsv_h_bin_controls.get_params()}
+        self.params['color']['hsv_s_channel'] = {'thresh' : self.hsv_s_bin_controls.get_params()}
+        self.params['color']['hsv_v_channel'] = {'thresh' : self.hsv_v_bin_controls.get_params()}
         self.params['thresh']['abs_sobel'] = {"kernel" : self.abs_sobel_k_controls.get_params(), "thresh" : self.abs_sobel_controls.get_params()}
         self.params['thresh']['mag_grad'] = {"kernel" : self.mag_grad_k_controls.get_params(), "thresh" : self.mag_grad_controls.get_params()}
         self.params['thresh']['dir_grad'] = {"kernel" : self.dir_grad_k_controls.get_params(), "thresh" : self.dir_grad_controls.get_params()}
@@ -292,8 +342,12 @@ class layout_widget(QtGui.QWidget):
     def set_parameters(self, params):
         self.params = params
         self.gray_bin_controls.set_params(self.params['color']['gray']['thresh'])
-        self.s_bin_controls.set_params(self.params['color']['s_channel']['thresh'])
-        self.h_bin_controls.set_params(self.params['color']['h_channel']['thresh'])
+        self.hls_h_bin_controls.set_params(self.params['color']['hls_h_channel']['thresh'])
+        self.hls_l_bin_controls.set_params(self.params['color']['hls_l_channel']['thresh'])
+        self.hls_s_bin_controls.set_params(self.params['color']['hls_s_channel']['thresh'])
+        self.hsv_h_bin_controls.set_params(self.params['color']['hsv_h_channel']['thresh'])
+        self.hsv_s_bin_controls.set_params(self.params['color']['hsv_s_channel']['thresh'])
+        self.hsv_v_bin_controls.set_params(self.params['color']['hsv_v_channel']['thresh'])
         self.abs_sobel_k_controls.set_params(self.params['thresh']['abs_sobel']['kernel'])
         self.abs_sobel_controls.set_params(self.params['thresh']['abs_sobel']['thresh'])
         self.mag_grad_k_controls.set_params(self.params['thresh']['mag_grad']['kernel'])
@@ -318,7 +372,7 @@ class layout_widget(QtGui.QWidget):
         proc_image = lane_image(self.cam_params, image, params)
 
         disp_image = None
-        if self.frame_select_value in ['gray_binary', 's_binary', 'h_binary', 'sobelx', 'sobely', 'mag_grad', 'dir_grad', 'combined_grad', 'transform_grad']:
+        if self.frame_select_value in ['gray_binary', 'hls_s_binary', 'hls_h_binary', 'hls_l_binary', 'hsv_s_binary', 'hsv_h_binary', 'hsv_v_binary', 'sobelx', 'sobely', 'mag_grad', 'dir_grad', 'mag_and_dir', 'combined_grad', 'transform_grad']:
             disp_image = np.zeros_like(proc_image.get_images()[self.frame_select_value])
             disp_image[proc_image.get_images()[self.frame_select_value] == 1] = 255
             

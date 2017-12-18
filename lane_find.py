@@ -23,6 +23,7 @@ if __name__ == "__main__":
     parser.add_argument('-v', '--test_video', help='test video file to use', dest='test_video', type=str, default='project_video.mp4')
     parser.add_argument('-o', '--output_video', help='name of output video file', dest='output_video', type=str, default='video_out.mp4')
     parser.add_argument('-s', '--subclip', help='process up to this point', dest='subclip', type=int, default=None)
+    parser.add_argument('-i', '--debug', help='display debug info into output', dest='debug', action='store_true', default=False)
     args = parser.parse_args()
 
     ## Calibrate camera
@@ -46,6 +47,7 @@ if __name__ == "__main__":
         params = pickle.load(open(args.params, 'rb'))
         
     current_lane = lane(cam_params, params)
+    current_lane.debug_output = args.debug
 
     if (args.test_image == None):
         print("Processing video file:{}".format(args.test_video))
@@ -60,6 +62,7 @@ if __name__ == "__main__":
         # test undistortion of a calibration image
         print("processing test image...")
 
+        current_lane.sanity_check = False
         test_image = mpimg.imread(args.test_image)
 
         final_image = current_lane.process_image(test_image)

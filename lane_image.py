@@ -196,7 +196,8 @@ class lane_image:
         
     def combine_gradients(self):
         grad_img = self.and_img(self.images['sobelx'], self.and_img(self.images['mag_grad'], self.images['dir_grad']))
-        color_img = self.or_img(self.or_img(self.images['hls_l_binary'], self.images['hsv_h_binary']), self.or_img(self.images['hsv_s_binary'], self.images['hsv_v_binary']))
+        color_img = self.or_img(self.or_img(self.images['hls_l_binary'], self.images['hsv_h_binary']), self.or_img(self.images['hls_s_binary'], self.images['hsv_v_binary']))
+#        color_img = self.or_img(self.images['hls_l_binary'], self.and_img(self.images['hsv_h_binary'], self.images['hsv_v_binary']))
         return self.or_img(grad_img, color_img)
         
         #grad_img = self.or_img(self.and_img(self.images['sobelx'], self.images['sobely']), self.and_img(self.images['mag_grad'], self.images['dir_grad']))

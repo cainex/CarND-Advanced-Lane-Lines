@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+from os.path import basename
 
 
 def calibrate_camera(images, nx, ny):
@@ -42,6 +43,8 @@ def calibrate_camera(images, nx, ny):
             objpoints.append(objp)
 
             cv2.drawChessboardCorners(img, board_shape, corners, ret)
+            cv2.imwrite('output_images/calib_{}'.format(basename(fname)), img)
+
 
     ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, image_size, None, None)
 

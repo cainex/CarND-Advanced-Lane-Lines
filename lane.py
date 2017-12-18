@@ -39,12 +39,18 @@ class lane:
         self.left_lane_pos_rmse = 0.0
         self.right_lane_pos_rmse = 0.0
 
+        self.sanity_check = True
+        self.debug_output = True
+
+        self.lane_boxes = None
+
     def get_img(self):
         return self.img
 
     def process_image(self, image):
         self.img = lane_image(self.camera_params, image, self.params)
         image = self.img.get_images()['transform_grad']
+        self.lane_boxes = np.dstack((image, image, image))*255
         ploty = np.linspace(0, image.shape[0]-1, image.shape[0])
 
         self.fit_line(image, self.left_lane, True)
@@ -59,40 +65,41 @@ class lane:
         self.rms = np.sqrt(np.mean(np.array([self.left_curverad,self.right_curverad])**2))
 #        self.mse = np.sqrt(mean_squared_error([self.left_curverad], [self.right_curverad]))
         self.mse = mean_squared_log_error([self.left_curverad], [self.right_curverad])
+        self.left_mse = mean_squared_log_error([self.left_curverad], [self.left_lane.radius_of_curvature])
+        self.right_mse = mean_squared_log_error([self.right_curverad], [self.right_lane.radius_of_curvature])
 
-        if len(self.left_lane.recent_xfitted) >= self.left_lane.history_depth and len(self.right_lane.recent_xfitted) >= self.right_lane.history_depth :
-            ### Both lane lines are locked, make some determinations based on 
-            ### previous values. 
-            self.left_mse = mean_squared_log_error([self.left_curverad], [self.left_lane.radius_of_curvature])
-            self.right_mse = mean_squared_log_error([self.right_curverad], [self.right_lane.radius_of_curvature])
-            if self.left_mse > 3.0:
-                self.good_left_lane = False
-                # self.good_left_lane = True
-            if self.right_mse > 3.0:
-                self.good_right_lane = False
-                # self.good_right_lane = True
+        if self.sanity_check:
+            if len(self.left_lane.recent_xfitted) >= self.left_lane.history_depth and len(self.right_lane.recent_xfitted) >= self.right_lane.history_depth :
+                ### Both lane lines are locked, make some determinations based on 
+                ### previous values. 
+                if self.left_mse > 3.0:
+                    # self.good_left_lane = False
+                    self.good_left_lane = True
+                if self.right_mse > 3.0:
+                    # self.good_right_lane = False
+                    self.good_right_lane = True
 
-            self.left_lane_pos = self.left_lane.get_pos()
-            self.right_lane_pos = self.right_lane.get_pos()
-            self.left_lane_pos_rmse = np.sqrt(mean_squared_error([self.left_lane_pos],[self.left_lane.line_base_pos]))
-            self.right_lane_pos_rmse = np.sqrt(mean_squared_error([self.right_lane_pos],[self.right_lane.line_base_pos]))
+                self.left_lane_pos = self.left_lane.get_pos()
+                self.right_lane_pos = self.right_lane.get_pos()
+                self.left_lane_pos_rmse = np.sqrt(mean_squared_error([self.left_lane_pos],[self.left_lane.line_base_pos]))
+                self.right_lane_pos_rmse = np.sqrt(mean_squared_error([self.right_lane_pos],[self.right_lane.line_base_pos]))
 
-            if self.left_lane_pos_rmse > 0.15:
-                self.good_left_lane = False
-            if self.right_lane_pos_rmse > 0.15:
-                self.good_right_lane = False
-            
-        else:
-            if self.left_lane.detected == True and self.right_lane.detected == True:
-                ### Both lanes were detected in this run
-                # 1) Check that curvature is similar
+                if self.left_lane_pos_rmse > 0.15:
+                    self.good_left_lane = False
+                if self.right_lane_pos_rmse > 0.15:
+                    self.good_right_lane = False
+                
+            else:
+                if self.left_lane.detected == True and self.right_lane.detected == True:
+                    ### Both lanes were detected in this run
+                    # 1) Check that curvature is similar
 
-                if self.mse > 1.000:
+                    if self.mse > 1.000:
+                        self.good_left_lane = False
+                        self.good_right_lane = False
+                else:
                     self.good_left_lane = False
                     self.good_right_lane = False
-            else:
-                self.good_left_lane = False
-                self.good_right_lane = False
 
         if self.good_left_lane:        
             self.update_lane(self.left_lane)
@@ -102,6 +109,8 @@ class lane:
         self.left_lane.decay()
         self.right_lane.decay()
 
+        self.draw_detect_image()
+        self.img.images['detect'] = self.lane_boxes
         return_image = self.draw_final_image(self.img, self.left_lane.bestx, self.right_lane.bestx, ploty)
 
         return return_image
@@ -133,6 +142,7 @@ class lane:
         # Fit a second order polynomial to each
         ploty = np.linspace(0, image.shape[0]-1, image.shape[0])
         lane.fit_polynomial(ploty)
+
 
         #######################################################################################################
 
@@ -185,6 +195,8 @@ class lane:
             win_y_high = image.shape[0] - window*window_height
             win_x_low = current - margin
             win_x_high = current + margin
+            # Draw boxes on image
+            cv2.rectangle(self.lane_boxes,(win_x_low,win_y_low),(win_x_high,win_y_high), (0,255,0), 2) 
             # Identify the nonzero pixels in x and y within the window
             good_inds = ((nonzeroy >= win_y_low) & (nonzeroy < win_y_high) & 
             (nonzerox >= win_x_low) &  (nonzerox < win_x_high)).nonzero()[0]
@@ -192,7 +204,7 @@ class lane:
             lane_inds.append(good_inds)
             # If you found > minpix pixels, recenter next window on their mean position
             if len(good_inds) > minpix:
-                x_current = np.int(np.mean(nonzerox[good_inds]))
+                current = np.int(np.mean(nonzerox[good_inds]))
 
         # Concatenate the arrays of indices
         lane_inds = np.concatenate(lane_inds)
@@ -233,26 +245,38 @@ class lane:
         # out_img_gray[img.get_images()['combined_grad'] == 1] = 255
         # out_img = cv2.cvtColor(out_img_gray, cv2.COLOR_GRAY2RGB)
         # result = cv2.addWeighted(out_img, 1, newwarp, 0.3, 0)
-        cv2.putText(result,'left:{:.2f}m curr:{:.2f}m'.format(self.left_lane.radius_of_curvature, self.left_curverad), (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
-        cv2.putText(result,'right:{:.2f}m curr{:.2f}m'.format(self.right_lane.radius_of_curvature, self.right_curverad), (1050, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
-        cv2.putText(result,'lslope:{:.2f}'.format(self.left_lane.slope), (50, 75), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
-        cv2.putText(result,'rslope:{:.2f}'.format(self.right_lane.slope), (1050, 75), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
-        cv2.putText(result,'lrmse:{:.4f}'.format(self.left_mse), (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
-        cv2.putText(result,'rrmse:{:.4f}'.format(self.right_mse), (1050, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
-        cv2.putText(result,'lfsu:{}'.format(self.left_lane.frames_since_update), (50, 125), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
-        cv2.putText(result,'rfsu:{}'.format(self.right_lane.frames_since_update), (1050, 125), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
-        cv2.putText(result,'lpos:{:.2f}-{:.2f}[{:.2f}]'.format(self.left_lane_pos, self.left_lane.line_base_pos, self.left_lane_pos_rmse), (50, 150), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
-        cv2.putText(result,'rpos:{:.2f}-{:.2f}[{:.2f}]'.format(self.right_lane_pos, self.right_lane.line_base_pos, self.right_lane_pos_rmse), (1050, 150), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+        if self.debug_output:
+            cv2.putText(result,'left:{:.2f}m curr:{:.2f}m'.format(self.left_lane.radius_of_curvature, self.left_curverad), (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+            cv2.putText(result,'right:{:.2f}m curr{:.2f}m'.format(self.right_lane.radius_of_curvature, self.right_curverad), (1050, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+            cv2.putText(result,'lslope:{:.2f}'.format(self.left_lane.slope), (50, 75), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+            cv2.putText(result,'rslope:{:.2f}'.format(self.right_lane.slope), (1050, 75), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+            cv2.putText(result,'lrmse:{:.4f}'.format(self.left_mse), (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+            cv2.putText(result,'rrmse:{:.4f}'.format(self.right_mse), (1050, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+            cv2.putText(result,'lfsu:{}'.format(self.left_lane.frames_since_update), (50, 125), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+            cv2.putText(result,'rfsu:{}'.format(self.right_lane.frames_since_update), (1050, 125), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+            cv2.putText(result,'lpos:{:.2f}-{:.2f}[{:.2f}]'.format(self.left_lane_pos, self.left_lane.line_base_pos, self.left_lane_pos_rmse), (50, 150), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+            cv2.putText(result,'rpos:{:.2f}-{:.2f}[{:.2f}]'.format(self.right_lane_pos, self.right_lane.line_base_pos, self.right_lane_pos_rmse), (1050, 150), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+
+            cv2.putText(result,'rmse:{:.4f}'.format(self.mse), (600, 75), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+            cv2.putText(result,'lupdate:{}'.format(self.good_left_lane), (500, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0) if self.good_left_lane else (255, 0, 0), 2)
+            cv2.putText(result,'rupdate:{}'.format(self.good_right_lane), (700, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0) if self.good_right_lane else (255, 0, 0), 2)
+            
+            cv2.putText(result, 'ldet:{}[{}]'.format(self.left_lane.detected, len(self.left_lane.allx)), (50, 600), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0) if self.left_lane.detected == True else (255,0,0), 2)
+            cv2.putText(result, 'rdet:{}[{}]'.format(self.right_lane.detected, len(self.right_lane.allx)), (1050, 600), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0) if self.right_lane.detected == True else (255,0,0), 2)
         
 
-        cv2.putText(result,'rms:{:.2f}m'.format(self.rms), (600, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
-        cv2.putText(result,'rmse:{:.4f}'.format(self.mse), (600, 75), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
-        cv2.putText(result,'lupdate:{}'.format(self.good_left_lane), (500, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0) if self.good_left_lane else (255, 0, 0), 2)
-        cv2.putText(result,'rupdate:{}'.format(self.good_right_lane), (700, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0) if self.good_right_lane else (255, 0, 0), 2)
-        
-        cv2.putText(result, 'ldet:{}[{}]'.format(self.left_lane.detected, len(self.left_lane.allx)), (50, 600), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0) if self.left_lane.detected == True else (255,0,0), 2)
-        cv2.putText(result, 'rdet:{}[{}]'.format(self.right_lane.detected, len(self.right_lane.allx)), (1050, 600), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0) if self.right_lane.detected == True else (255,0,0), 2)
+            cv2.putText(result,'Radius of Curvature:{:.2f}m'.format(self.rms), (600, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+
+
         return result
+
+    def draw_detect_image(self):
+        ploty = np.linspace(0, self.lane_boxes.shape[0]-1, self.lane_boxes.shape[0], dtype=int)
+
+        self.lane_boxes[self.left_lane.ally, self.left_lane.allx] = [255, 0, 0]
+        self.lane_boxes[self.right_lane.ally, self.right_lane.allx] = [0, 0, 255]
+        self.lane_boxes[ploty, np.array(self.left_lane.currentx, dtype=int)] = [255, 255, 0]
+        self.lane_boxes[ploty, np.array(self.right_lane.currentx, dtype=int)] = [255, 255, 0]
 
 
 
