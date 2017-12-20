@@ -17,6 +17,7 @@ The goals / steps of this project are the following:
 [calib_source]: ./camera_cal/calibration2.jpg "Camera Calibration"
 [calib_points]: ./output_images/calib_calibration2.jpg "Calibration Points"
 [calib_undist]: ./output_images/undist_calibration2.jpg "Undistorted Calibration"
+[orig]: ./output_images/orig.png
 [undist]: ./output_images/undistorted.png
 [grayscale]: ./output_images/gray.png
 [hls_l_binary]: ./output_images/hls_l_binary.png
@@ -119,14 +120,18 @@ To process a single image and dump the results, run:
 
 #### 1. Provide an example of a distortion-corrected image.
 
-To demonstrate this step, I will describe how I apply the distortion correction to one of the test images like this one:
+Each process image is first run through the undistort_image() method:
+Original Image:
+![alt text][orig]
+
+Results after undistortion:
 ![alt text][undist]
 
 #### 2. Describe how (and identify where in your code) you used color transforms, gradients or other methods to create a thresholded binary image.  Provide an example of a binary image result.
 
 Each image is first undistorted using the calibration parameters then processed for color and gradient thresholds using the lane_image class in lane_image.py. Each image is converted to grayscale, HSV and HLS colorspaces. The HSV and HLS colorspace images are each split into their constituent parts. The sobel-X, sobel-Y, maginitude and direction gradients are also calculated.
 
-Once the colorspace conversion is complete, the individual channels are passed through a binary filter using threshold passed into the class initialization. These parameters are given to the lane_find.py application via a pickled data file, and set using the param_utils.py GUI application. Using this application, I was able to experiment with different combinations of images and different threshold/kernel values. This application was then used to save out the parameters as a pickled data file to be used with the lane_find.py application.
+Once the colorspace conversion is complete, the individual channels are passed through a binary filter using threshold values passed into the class initialization. These parameters are given to the lane_find.py application via a pickled data file, and set using the param_utils.py GUI application. Using this application, I was able to experiment with different combinations of images and different threshold/kernel values. This application was then used to save out the parameters as a pickled data file to be used with the lane_find.py application.
 
 ![alt text][params_utils_1]
 ![alt text][param_utils_2]
@@ -213,7 +218,7 @@ If a lane line was detected, we then update the lane_line object to save this pa
 
 #### 5. Describe how (and identify where in your code) you calculated the radius of curvature of the lane and the position of the vehicle with respect to center.
 
-The curvature of the lane is done using the calculate_curvature() method of the lane_line object in lane_line.py [lines 57-65]. The curvature is calculated for each lane on the current detection along with each lane's best fit. The current fit curvature is used for sanity checks when the lane is first being detected. The best fit curvature results are then averaged together to determine the curvature of the lane. The lane curvature is then overlayed on the resulting image.
+The curvature of the lane is calculated using the calculate_curvature() method of the lane_line object in lane_line.py [lines 57-65]. The curvature is calculated for each lane on the current detection along with each lane's best fit. The current fit curvature is used for sanity checks when the lane is first being detected. The best fit curvature results are then averaged together to determine the curvature of the lane. The lane curvature is then overlayed on the resulting image.
 
 #### 6. Provide an example image of your result plotted back down onto the road such that the lane area is identified clearly.
 
